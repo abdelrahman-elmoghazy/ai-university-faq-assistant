@@ -39,7 +39,7 @@ services:
   # ────────────────────────────────────────────────────────
   auth-service:
     build:
-      context: ../ai-university-faq-assistant-main
+      context: .
       dockerfile: Dockerfile
     container_name: auth_service
     restart: unless-stopped
@@ -69,6 +69,37 @@ services:
       start_period: 20s
 
   # ────────────────────────────────────────────────────────
+  #  FAQ SERVICE
+  # ────────────────────────────────────────────────────────
+  faq-service:
+    build:
+      context: ./faq-service
+      dockerfile: Dockerfile
+    container_name: faq_service
+    restart: unless-stopped
+    expose:
+      - "5001"
+    env_file:
+      - .env
+    environment:
+      FLASK_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      HOST: 0.0.0.0
+      PORT: 5001
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal_net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # ────────────────────────────────────────────────────────
   #  POSTGRESQL
   # ────────────────────────────────────────────────────────
   postgres:
@@ -84,7 +115,7 @@ services:
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ../ai-university-faq-assistant-main/migrations:/docker-entrypoint-initdb.d:ro
+      - ./migrations:/docker-entrypoint-initdb.d:ro
     networks:
       - internal_net
     healthcheck:
