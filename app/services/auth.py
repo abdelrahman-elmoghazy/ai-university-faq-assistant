@@ -60,8 +60,8 @@ class AuthService:
 
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Registration error: {str(e)}")
-            return None, f"Registration failed: {str(e)}"
+            logger.exception("Registration error")
+            return None, "Registration failed. Please try again."
 
     @staticmethod
     def login_user(email: str, password: str, ip_address: str = None, user_agent: str = None) -> Tuple[Optional[User], Optional[str]]:
@@ -118,8 +118,8 @@ class AuthService:
             return user, None
 
         except Exception as e:
-            logger.error(f"Login error: {str(e)}")
-            return None, f"Login failed: {str(e)}"
+            logger.exception("Login error")
+            return None, "Login failed. Please try again."
 
     @staticmethod
     def _log_login_attempt(user_id: int = None, email: str = None, ip_address: str = None, 

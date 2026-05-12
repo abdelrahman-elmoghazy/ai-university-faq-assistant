@@ -15,7 +15,7 @@ class Config:
     SQLALCHEMY_ECHO = False
 
     # JWT
-    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'dev-secret-key-change-in-production')
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
     JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
     JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', 24))
     JWT_REFRESH_EXPIRATION_DAYS = int(os.getenv('JWT_REFRESH_EXPIRATION_DAYS', 7))
@@ -36,8 +36,8 @@ class Config:
     GITHUB_REDIRECT_URI = os.getenv('GITHUB_REDIRECT_URI', 'http://localhost:3000/auth/github/callback')
 
     # Internal Service
-    INTERNAL_API_KEY = os.getenv('INTERNAL_API_KEY', 'internal-key-dev')
-    SERVICE_SECRET = os.getenv('SERVICE_SECRET', 'service-secret-dev')
+    INTERNAL_API_KEY = os.getenv('INTERNAL_API_KEY')
+    SERVICE_SECRET = os.getenv('SERVICE_SECRET')
 
     # CORS
     CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
@@ -58,6 +58,10 @@ class TestingConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     DEBUG = True
+    # Provide testing secrets so tests run without requiring env files
+    JWT_SECRET_KEY = 'test-secret'
+    INTERNAL_API_KEY = 'test-internal'
+    SERVICE_SECRET = 'test-service-secret'
 
 
 class ProductionConfig(Config):
@@ -68,7 +72,7 @@ class ProductionConfig(Config):
     @classmethod
     def validate(cls):
         """Fail fast if required production secrets are missing."""
-        required_vars = ['JWT_SECRET_KEY']
+        required_vars = ['JWT_SECRET_KEY', 'INTERNAL_API_KEY', 'SERVICE_SECRET']
         missing = [var for var in required_vars if not os.getenv(var)]
         if missing:
             raise RuntimeError(
