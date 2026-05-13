@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Monitoring Dashboard</title>
+  <style>
+    body { font-family: Arial; background: #f0f2f5; margin: 0; padding: 20px; }
+    h1 { color: #333; }
+    .grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 15px; margin: 20px 0; }
+    .card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    .big { font-size: 2.5em; font-weight: bold; color: #1976D2; }
+    .label { color: #888; margin-top: 5px; }
+    table { width: 100%; border-collapse: collapse; }
+    th,td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #f5f5f5; }
+    .badge { padding: 3px 10px; border-radius: 12px; font-size:.85em; }
+    .success { background:#e8f5e9; color:#2e7d32; }
+    .failed  { background:#ffebee; color:#c62828; }
+    .info    { background:#e3f2fd; color:#1565c0; }
+  </style>
+</head>
+<body>
+  <h1>🔍 Monitoring Dashboard</h1>
+  <p id="updated" style="color:#999">Loading...</p>
+
+  <div class="grid" id="auth-cards">
+    <div class="card"><div class="big" id="sl">-</div><div class="label">✅ Successful Logins</div></div>
+    <div class="card"><div class="big" id="fl" style="color:#e53935">-</div><div class="label">❌ Failed Logins</div></div>
+    <div class="card"><div class="big" id="ua" style="color:#fb8c00">-</div><div class="label">🚫 Unauthorized Access</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:15px">
+    <h2>📦 Queue Status</h2>
+    <table><thead><tr><th>Queue</th><th>Messages Pending</th><th>Consumers</th></tr></thead>
+    <tbody id="queue-body"></tbody></table>
+  </div>
+
+  <div class="card" style="margin-bottom:15px">
+    <h2>⚙️ Worker Jobs</h2>
+    <table><thead><tr><th>Task</th><th>Status</th><th>Count</th></tr></thead>
+    <tbody id="jobs-body"></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>📋 Recent Events</h2>
+    <table><thead><tr><th>Time</th><th>Action</th><th>Status</th><th>IP</th></tr></thead>
+    <tbody id="events-body"></tbody></table>
+  </div>
+
+  <script>
+    async function load() {
+      const res = await fetch('/api/stats');
+      const d = await res.json();
+      document.getElementById('updated').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+      document.getElementById('sl').textContent = d.auth_stats.success_logins;
+      document.getElementById('fl').textContent = d.auth_stats.failed_logins;
+      document.getElementById('ua').textContent = d.auth_stats.unauthorized;
+
+      document.getElementById('queue-body').innerHTML = Object.entries(d.queues)
+        .filter(([k,v]) => !v.error)
+        .map(([k,v]) => `<tr><td>${k}</td><td>${v.messages}</td><td>${v.consumers}</td></tr>`).join('');
+
+      document.getElementById('jobs-body').innerHTML = d.job_stats
+        .map(j => `<tr><td>${j.action}</td><td><span class="badge ${j.status==='success'?'success':'failed'}">${j.status}</span></td><td>${j.count}</td></tr>`).join('');
+
+      document.getElementById('events-body').innerHTML = d.recent_events
+        .map(e => `<tr><td>${e.time.split('.')[0]}</td><td>${e.action}</td><td><span class="badge ${e.status==='success'?'success':e.status==='failed'?'failed':'info'}">${e.status||'-'}</span></td><td>${e.ip||'-'}</td></tr>`).join('');
+    }
+    load();
+    setInterval(load, 10000);
+  </script>
+</body>
+</html>

@@ -12,6 +12,7 @@ from app.middleware.auth_middleware import (
     admin_required, internal_service_auth_required
 )
 from app.models import User, db
+from app.services.event_publisher import publish_auth_event
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,14 @@ def register():
             user_agent=get_user_agent()
         )
 
+        # Publish to RabbitMQ
+        publish_auth_event("auth.register", {
+            "user_id":    user.id,
+            "email":      user.email,
+            "username":   user.username,
+            "ip_address": get_client_ip(),
+        })
+
         return jsonify({
             'message': 'Registration successful',
             'user': user.to_dict()
@@ -116,6 +125,11 @@ def login():
         )
 
         if error:
+            publish_auth_event("auth.login.failed", {
+                "email":      req.email,
+                "ip_address": get_client_ip(),
+                "reason":     error,
+            })
             return jsonify({
                 'error': 'Authentication Failed',
                 'message': error
@@ -123,6 +137,13 @@ def login():
 
         # Generate tokens
         tokens = AuthService.generate_tokens(user)
+
+        publish_auth_event("auth.login.success", {
+            "user_id":    user.id,
+            "email":      user.email,
+            "ip_address": get_client_ip(),
+            "user_agent": get_user_agent(),
+        })
 
         return jsonify({
             'message': 'Login successful',
@@ -191,6 +212,11 @@ def logout():
             ip_address=get_client_ip(),
             user_agent=get_user_agent()
         )
+
+        publish_auth_event("auth.logout", {
+            "user_id":    request.user_id,
+            "ip_address": get_client_ip(),
+        })
 
         return jsonify({
             'message': 'Logout successful'

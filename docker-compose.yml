@@ -152,6 +152,76 @@ services:
       retries: 5
       start_period: 30s
 
+  # ────────────────────────────────────────────────────────
+  #  LOGGING SERVICE  (Member 3)
+  # ────────────────────────────────────────────────────────
+  logging-service:
+    build:
+      context: ./logging-service
+      dockerfile: Dockerfile
+    container_name: logging_service
+    restart: unless-stopped
+    expose:
+      - "5002"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      HOST: 0.0.0.0
+      PORT: 5002
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal_net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5002/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+
+  # ────────────────────────────────────────────────────────
+  #  WORKER SERVICE  (Member 3)
+  # ────────────────────────────────────────────────────────
+  worker-service:
+    build:
+      context: ./worker-service
+      dockerfile: Dockerfile
+    container_name: worker_service
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      LOGGING_SERVICE_URL: http://logging-service:5002
+      LOG_LEVEL: INFO
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      logging-service:
+        condition: service_healthy
+    networks:
+      - internal_net
+
+  # ────────────────────────────────────────────────────────
+  #  MONITORING DASHBOARD  (Member 3)
+  # ────────────────────────────────────────────────────────
+  monitoring-dashboard:
+    build:
+      context: ./monitoring-dashboard
+      dockerfile: Dockerfile
+    container_name: monitoring_dashboard
+    restart: unless-stopped
+    ports:
+      - "8080:80"      # Access at http://localhost:8080
+    depends_on:
+      logging-service:
+        condition: service_healthy
+    networks:
+      - internal_net
+      - public_net
+
 # ────────────────────────────────────────────────────────
 #  NETWORKS
 # ────────────────────────────────────────────────────────
