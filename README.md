@@ -1,308 +1,160 @@
-# AI University FAQ Assistant – System Documentation
-
-## 📌 Overview
-
-The AI University FAQ Assistant is a **secure, distributed microservices-based system** designed to handle university-related queries using AI-powered responses, authentication, and scalable backend services.
-
-The system focuses on **security, modularity, and production-level architecture**, integrating multiple services including authentication, AI processing, FAQ management, background workers, and observability tools.
-
----
-
-## 🧱 System Architecture
-
-The system is built using a **microservices architecture**:
-
-* Authentication Service (Auth & Security)
-* API Gateway (Nginx Reverse Proxy)
-* FAQ Service (Core Business Logic)
-* AI Service (LLM Integration)
-* Worker Service (Background Jobs)
-* Logging & Monitoring Service
-* Frontend (React Application)
-* RabbitMQ (Message Broker)
-* PostgreSQL (Database)
-
----
-
-## 🔐 Authentication & Security System
-
-### Features
-
-* User registration and login
-* JWT-based authentication (Access & Refresh tokens)
-* OAuth2 login (Google, GitHub)
-* Role-Based Access Control (RBAC)
-* Password hashing using bcrypt/Argon2
-* Internal service authentication (API keys)
-* Audit logging for security events
-
-### Security Rules
-
-* No hardcoded secrets (all stored in `.env`)
-* JWT secret validation enforced in production
-* Protection against unauthorized access
-* Users cannot access other users’ data
-* Admin privilege protection
-
----
-
-## 🌐 API Gateway Layer
-
-The API Gateway acts as the **single entry point** for all requests.
-
-### Responsibilities
-
-* Reverse proxy routing (Nginx)
-* HTTPS / SSL enforcement
-* HTTP → HTTPS redirect
-* Rate limiting
-* Request size limiting
-* Security headers enforcement
-* Service isolation (no direct public access to internal services)
-
----
-
-## 📚 FAQ Service (Core Backend)
-
-### Features
-
-* CRUD operations for FAQs
-* Question & answer handling
-* Conversation history
-* PostgreSQL integration
-* Input validation and sanitization
-* Ownership checks for data access control
-
-### Database Tables
-
-* users
-* roles
-* permissions
-* user_roles
-* questions
-* answers
-* documents
-* chunks
-* audit_logs
-
----
-
-## 🤖 AI Service
-
-### Features
-
-* AI-powered answer generation
-* Integration with LLM providers (OpenRouter / Ollama)
-* Context-aware responses using FAQ data
-* Prompt engineering pipeline
-* Vector database support (pgvector / Qdrant)
-
----
-
-## ⚙️ Worker & Queue System
-
-### Features
-
-* RabbitMQ-based message queue
-* Background job processing
-* Document chunking
-* Embedding generation
-* Async processing pipeline
-
-### Worker Tasks
-
-* AI preprocessing jobs
-* Document processing
-* Logging events
-
----
-
-## 📊 Logging & Monitoring System
-
-### Features
-
-* Centralized logging service
-* Audit trail tracking
-* Monitoring dashboard
-
-### Logged Events
-
-* Login attempts (success/failure)
-* Logout events
-* File uploads/downloads
-* AI queries
-* Unauthorized access attempts
-* Background job status
-
----
-
-## 🖥️ Frontend Application
-
-### Features
-
-* User authentication UI
-* Dashboard
-* Chat interface (AI assistant)
-* Admin panel
-* API integration layer
-
----
-
-## 📁 File Security System
-
-### Security Features
-
-* File type validation (MIME + extension)
-* Blocked extensions:
-
-  * .exe
-  * .php
-  * .js
-  * .bat
-  * .sh
-* File size limits
-* Secure storage outside public directory
-* File encryption (AES / Fernet)
-* SHA-256 integrity verification
-
----
-
-## 🗄️ Database Design (PostgreSQL)
-
-### Core Tables
-
-* users → user accounts
-* roles → system roles
-* permissions → access rules
-* user_roles → role mapping
-* questions → user queries
-* answers → AI responses
-* documents → uploaded files
-* chunks → processed text segments
-* audit_logs → system activity tracking
-
----
-
-## 🔄 Authentication Flow
-
-1. User registers or logs in
-2. Credentials validated by Auth Service
-3. JWT tokens generated (access + refresh)
-4. Client includes token in requests
-5. API Gateway validates token
-6. Services enforce RBAC rules
-
----
-
-## 🧪 Testing Strategy
-
-### Authentication Testing
-
-* Invalid login attempts
-* Expired token validation
-* Unauthorized access checks
-
-### File Security Testing
-
-* Valid file uploads
-* Invalid file rejection
-* Oversized file handling
-
-### System Testing
-
-* Rate limiting validation
-* Internal service authentication
-* Queue processing reliability
-
----
-
-## 🐳 Deployment
-
-### Docker Setup
+# AI University FAQ Assistant
+
+A distributed system for handling university FAQ queries with AI-powered responses. Built as a course project for Secure Distributed Systems. The system uses a microservices architecture with JWT authentication, message queues, encrypted file storage, and a centralized monitoring pipeline.
+
+## Architecture
+
+9 containers orchestrated with Docker Compose:
+
+| Service | Container | Description |
+|---------|-----------|-------------|
+| API Gateway | `api_gateway` (Nginx) | Reverse proxy, HTTPS termination, rate limiting, security headers |
+| Auth Service | `auth_service` | Registration, login, JWT tokens, RBAC |
+| FAQ Service | `faq_service` | Question answering, AI integration, file uploads |
+| Worker Service | `worker_service` | Background document processing via RabbitMQ |
+| Logging Service | `logging_service` | Centralized audit trail storage |
+| Monitoring Dashboard | `monitoring_dashboard` | Real-time system monitoring UI |
+| Frontend | `frontend` | React SPA (login, chat, file upload, admin panel) |
+| PostgreSQL | `postgres_db` | Main database (with pgvector extension) |
+| RabbitMQ | `rabbitmq` | Message broker for async tasks |
+
+Network layout:
+- `public_net` — only Nginx is exposed to the host (ports 80, 443)
+- `internal_net` (`internal: true`) — all backend services, no direct public access
+
+## Security Features
+
+- JWT authentication with access + refresh tokens (HS256, configurable expiration)
+- Password hashing with bcrypt (12 rounds)
+- Role-based access control — `admin` and `user` roles with a permissions table
+- OAuth2 login support (Google, GitHub)
+- HTTPS with TLS, automatic HTTP-to-HTTPS redirect
+- Rate limiting per endpoint (login: 5/min, auth: 10/min, general API: 30/min)
+- Input validation on all endpoints (email format, password strength, question length, file size)
+- Secure file upload — extension + MIME type validation, blocked dangerous types (.exe, .php, .js, .bat, .sh)
+- File encryption at rest using Fernet (AES-128-CBC + HMAC-SHA256)
+- SHA-256 integrity verification for uploaded files
+- Service-to-service authentication using internal API keys
+- Nginx strips `X-Internal-API-Key` from external requests to prevent spoofing
+- Security headers on all responses (HSTS, CSP, X-Frame-Options, X-Content-Type-Options)
+- Error handling hides stack traces in production mode
+
+## How to Run
 
 ```bash
-docker-compose up --build
-```
-
-### Services Included
-
-* auth-service
-* faq-service
-* ai-service
-* worker-service
-* api-gateway (nginx)
-* postgres
-* rabbitmq
-
----
-
-## ⚙️ Environment Variables
-
-All services use `.env` files for configuration:
-
-```
-DATABASE_URL=postgresql://user:pass@db:5432/app_db
-JWT_SECRET_KEY=strong-secret-key
-JWT_ALGORITHM=HS256
-INTERNAL_API_KEY=secure-key
-```
-
----
-
-## 🚨 Security Best Practices
-
-* Never commit `.env` files
-* Enforce HTTPS in production
-* Use strong JWT secrets
-* Enable RBAC strictly
-* Validate all inputs
-* Restrict internal service access
-* Monitor audit logs continuously
-
----
-
-## 📈 Future Improvements
-
-* Kubernetes deployment
-* Redis caching layer
-* Advanced rate limiting (user-based)
-* AI response optimization
-* Multi-language support
-* Advanced threat detection system
-
----
-
-## 👤 Team Member 5 — Frontend, AI & File Security
-
-### Responsibilities
-* **React Frontend** — Login, Register, Dashboard, AI Chat, File Upload, Admin Panel
-* **AI Integration** — OpenRouter / Ollama / Mock fallback with RAG-ready architecture
-* **Secure File Upload** — Extension + MIME validation, blocked dangerous files
-* **File Encryption** — Fernet (AES-128-CBC) encryption at rest
-* **SHA-256 Integrity** — Pre-encryption hash stored and verified on demand
-* **Admin Dashboard** — System stats, audit logs, recent AI queries
-
-### Quick Start (Frontend)
-```bash
-cd frontend
+# 1. Set up environment
 cp .env.example .env
-npm install
-npm run dev
-# Open http://localhost:3000
+# Edit .env and fill in all CHANGE_ME values
+
+# 2. Generate SSL certs (self-signed for development)
+bash scripts/generate_certs.sh localhost
+
+# 3. Start everything
+docker compose up --build
+
+# 4. Wait ~30s for all services to initialize, then verify
+docker compose ps
 ```
 
-### File Security
+Access points:
+- Frontend: http://localhost:3000
+- API (HTTPS): https://localhost
+- Monitoring Dashboard: http://localhost:8081
+
+## API Endpoints
+
+| Service | Base Path | Key Endpoints |
+|---------|-----------|---------------|
+| Auth | `/api/auth` | `/register`, `/login`, `/refresh`, `/me`, `/logout` |
+| FAQ | `/api/faq` | `/ask`, `/history`, `/conversations` |
+| Files | `/api/files` | `/upload`, `/my-files`, `/<id>/verify` |
+| Admin | `/api/admin` | `/stats`, `/audit-logs`, `/recent-queries` |
+| Logging | `/internal` | `/logs` (internal only, not accessible from outside) |
+
+All protected endpoints require `Authorization: Bearer <token>` header.
+Admin endpoints additionally require the `admin` role in the JWT payload.
+
+## Database
+
+PostgreSQL 15 with the following tables:
+
+- `users` — accounts with hashed passwords
+- `roles`, `permissions`, `user_roles` — RBAC infrastructure
+- `documents` — uploaded file metadata, encrypted paths, SHA-256 hashes
+- `chunks` — document segments for RAG processing
+- `questions`, `answers` — AI chat history
+- `audit_logs` — system event tracking
+- `service_logs` — worker and service-level logs
+
+Migrations are in `migrations/` and run automatically on first startup.
+
+## Message Queue
+
+```
+Auth/FAQ Service  →  publishes event  →  RabbitMQ (topic exchange)
+                                              ↓
+                                      Worker Service (consumer)
+                                              ↓
+                                      Logging Service (HTTP POST)
+                                              ↓
+                                         PostgreSQL
+                                              ↓
+                                     Monitoring Dashboard
+```
+
+Events tracked: login success/failure, logout, registration, file uploads, AI queries, worker job status.
+
+RabbitMQ is configured with a custom user (no default guest account), credentials set via `.env`.
+
+## Testing
+
 ```bash
-# Generate encryption key
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-# Add to .env as FILE_ENCRYPTION_KEY=<generated_key>
+# Infrastructure tests (HTTPS, rate limiting, headers, port exposure)
+bash scripts/test_infra.sh
+
+# API integration tests
+python test_api.py
+
+# Unit tests
+python -m pytest tests/
 ```
 
-### Documentation
-See [docs/team-member-5.md](docs/team-member-5.md) for full details.
+## Project Structure
 
----
+```
+├── app/                    # Auth Service (Flask)
+│   ├── middleware/          #   JWT validation middleware
+│   ├── models/             #   SQLAlchemy models
+│   ├── routes/             #   Auth and admin endpoints
+│   ├── services/           #   Auth, RBAC, OAuth, event publishing
+│   └── schemas/            #   Input validation schemas
+├── faq-service/            # FAQ Service (Flask)
+│   └── app/                #   Controllers, routes, services, validators
+├── worker-service/         # Background worker (RabbitMQ consumer)
+│   └── app/                #   Consumers, processors, tasks
+├── logging-service/        # Audit log service (Flask)
+│   └── app/                #   Log routes, models, services
+├── monitoring-dashboard/   # Dashboard SPA (static HTML/JS)
+├── frontend/               # React + Vite frontend
+│   └── src/                #   Pages, components, API layer, auth context
+├── nginx/                  # API Gateway configuration
+│   ├── conf.d/             #   HTTPS, redirect, RabbitMQ proxy configs
+│   └── certs/              #   SSL certificates
+├── rabbitmq/               # RabbitMQ config and queue definitions
+├── migrations/             # SQL schema files
+├── scripts/                # Helper scripts (certs, tests, management)
+├── tests/                  # Test files
+├── config/                 # App configuration
+├── docker-compose.yml      # Full stack orchestration
+└── .env.example            # Environment variable template
+```
 
-## 📌 Summary
+## Team
 
-This system is designed to be a **secure, scalable, production-ready AI-powered university assistant platform** built with modern backend architecture principles, strong security layers, and modular microservices design.
+| Member | Responsibility |
+|--------|---------------|
+| Member 1 | Authentication, JWT, RBAC, OAuth |
+| Member 2 | API Gateway, Nginx, HTTPS, Docker Compose, DevOps |
+| Member 3 | FAQ Service, database schema, input validation |
+| Member 4 | RabbitMQ, Worker Service, Logging Service, Monitoring Dashboard |
+| Member 5 | Frontend, AI integration, file upload security, encryption |
