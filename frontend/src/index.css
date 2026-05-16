@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+/* ── Balanced SaaS Design Tokens (1:1 Scaling) ──────────────── */
+:root {
+  --bg-main: #020617;        
+  --bg-sidebar: #0b0f1a;     
+  --bg-card: #111827;        
+  --border-muted: rgba(255, 255, 255, 0.08);
+  --primary: #6366f1;        
+  --primary-glow: rgba(99, 102, 241, 0.15);
+  --text-main: #f8fafc;      
+  --text-muted: #94a3b8;     
+  --accent: #c084fc;         
+  
+  --sidebar-width: 256px;    /* Reduced from 280px */
+}
+
+/* ── Base ────────────────────────────────────────────────── */
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  line-height: 1.5; /* Slightly tighter than before */
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Global Layout ───────────────────────────────────────── */
+
+.sidebar-fixed {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  background-color: var(--bg-sidebar);
+  border-right: 1px solid var(--border-muted);
+  z-index: 50;
+}
+
+.main-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 100vh;
+}
+
+.container-premium {
+  width: 100%;
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 2.5rem 3rem; /* Reduced from 3rem/4rem */
+}
+
+/* ── Premium Components (Standard SaaS Scale) ────────────── */
+
+.card-premium {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-muted);
+  border-radius: 1rem; /* Reduced from 1.5rem */
+  padding: 1.75rem;     /* Reduced from 2.5rem */
+  box-shadow: 0 15px 20px -5px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.card-premium:hover {
+  border-color: rgba(99, 102, 241, 0.2);
+  transform: translateY(-1px);
+}
+
+.input-premium {
+  width: 100%;
+  height: 3rem; /* 48px height - standardized */
+  background-color: #030712;
+  border: 1px solid var(--border-muted);
+  border-radius: 0.75rem;
+  padding: 0 1rem;
+  font-size: 0.9375rem; /* ~15px */
+  color: white;
+  transition: all 0.2s ease;
+}
+
+.input-premium:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--primary-glow);
+  outline: none;
+}
+
+.btn-premium {
+  height: 3rem; /* 48px height - standardized */
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  padding: 0 1.5rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-premium:hover {
+  box-shadow: 0 8px 15px -3px rgba(99, 102, 241, 0.3);
+  filter: brightness(1.05);
+}
+
+/* ── Typography Scale ────────────────────────────────────── */
+
+.heading-xl {
+  font-size: 2.5rem; /* 40px - Reduced from 3rem */
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.heading-lg {
+  font-size: 1.5rem; /* 24px - Reduced from 1.875rem */
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.text-subtle {
+  color: var(--text-muted);
+  font-size: 1rem; /* 16px - Reduced from 1.125rem */
+}
+
+/* ── Chat Specific ────────────────────────────────────────── */
+
+.message-bubble {
+  padding: 0.75rem 1rem;
+  border-radius: 1rem;
+  max-width: 85%;
+  line-height: 1.5;
+  font-size: 0.9375rem;
+}
+
+/* ── Animations ──────────────────────────────────────────── */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s ease-out forwards;
+}

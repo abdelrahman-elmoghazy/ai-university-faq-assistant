@@ -19,3 +19,9 @@ logs/
 .vscode/
 *.swp
 *.swo
+# Frontend
+node_modules/
+frontend/dist/
+frontend/node_modules/
+# Secure uploads
+secure_uploads/

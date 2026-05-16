@@ -18,6 +18,16 @@ class LogEntry(db.Model):
     details       = db.Column(db.JSON, nullable=True)
     created_at    = db.Column(db.DateTime, default=datetime.utcnow)
 
+    def __init__(self, source=None, action=None, user_id=None, user_email=None, ip_address=None, status=None, details=None, **kwargs):
+        super().__init__(**kwargs)
+        self.source = source
+        self.action = action
+        self.user_id = user_id
+        self.user_email = user_email
+        self.ip_address = ip_address
+        self.status = status
+        self.details = details
+
     def to_dict(self):
         return {
             "id":         self.id,

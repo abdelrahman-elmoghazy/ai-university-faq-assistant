@@ -1,22 +1,11 @@
-"""
-Document Consumer
-Listens to document.events queue and handles:
-  - document.uploaded      → log upload + trigger chunking job
-  - document.downloaded    → log download
-  - document.ai_query      → log AI query
-  - document.chunk_request → run document chunking + embedding simulation
-
-These jobs are published by the FAQ Service or the Auth Service.
-"""
 import json
 import logging
 import threading
 import time
-import hashlib
-
 import pika
 
 from app.utils.logging_client import send_log
+from app.processors.document_processor import DocumentProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -27,15 +16,17 @@ EXCHANGE_NAME = "document.exchange"
 class DocumentConsumer(threading.Thread):
     """Background thread that processes document jobs."""
 
-    def __init__(self, rmq_conn, logging_service_url: str):
+    def __init__(self, rmq_url: str, logging_service_url: str):
         super().__init__(daemon=True, name="DocumentConsumer")
-        self.rmq = rmq_conn
+        self.rmq_url = rmq_url
         self.logging_url = logging_service_url
         self._stop_event = threading.Event()
+        self._connection = None
 
     # ------------------------------------------------------------------ #
 
     def run(self):
+        logger.info("Worker started")
         while not self._stop_event.is_set():
             try:
                 self._consume()
@@ -45,11 +36,18 @@ class DocumentConsumer(threading.Thread):
 
     def stop(self):
         self._stop_event.set()
+        if self._connection and not self._connection.is_closed:
+            self._connection.close()
 
     # ------------------------------------------------------------------ #
 
     def _consume(self):
-        channel = self.rmq.channel()
+        params = pika.URLParameters(self.rmq_url)
+        params.heartbeat = 60
+        self._connection = pika.BlockingConnection(params)
+        logger.info("RabbitMQ connected")
+        
+        channel = self._connection.channel()
 
         channel.exchange_declare(
             exchange=EXCHANGE_NAME,
@@ -67,20 +65,24 @@ class DocumentConsumer(threading.Thread):
             routing_key="document.*"
         )
 
-        channel.basic_qos(prefetch_count=5)
+        channel.basic_qos(prefetch_count=1)
         channel.basic_consume(
             queue=QUEUE_NAME,
             on_message_callback=self._on_message
         )
 
-        logger.info(f"DocumentConsumer listening on queue '{QUEUE_NAME}' …")
+        logger.info("DocumentConsumer waiting for messages")
         channel.start_consuming()
 
     def _on_message(self, channel, method, properties, body: bytes):
         routing_key = method.routing_key
         try:
             event = json.loads(body)
-            logger.info(f"Received [{routing_key}]: {event}")
+            if routing_key == "document.uploaded":
+                logger.info("document.uploaded received")
+            else:
+                logger.info(f"Received [{routing_key}]: {event}")
+            
             self._process(routing_key, event)
             channel.basic_ack(delivery_tag=method.delivery_tag)
         except json.JSONDecodeError:
@@ -116,9 +118,9 @@ class DocumentConsumer(threading.Thread):
             "details":  event,
             "status":   "success",
         })
-        logger.info(f"Upload logged for file: {event.get('filename')}")
+        # logger.info(f"Upload logged for document_id: {event.get('document_id')}")
 
-        # Simulate triggering chunking
+        # Trigger real chunking
         self._run_chunking_job(event)
 
     def _handle_download(self, event: dict):
@@ -129,7 +131,6 @@ class DocumentConsumer(threading.Thread):
             "details": event,
             "status":  "success",
         })
-        logger.info(f"Download logged for file: {event.get('filename')}")
 
     def _handle_ai_query(self, event: dict):
         send_log(self.logging_url, {
@@ -139,78 +140,53 @@ class DocumentConsumer(threading.Thread):
             "details": event,
             "status":  "success",
         })
-        logger.info(f"AI query logged: {str(event.get('query',''))[:80]}")
 
     def _handle_chunking(self, event: dict):
         """Background job: chunk document text and generate embeddings."""
         self._run_chunking_job(event)
 
-    # ─── Core chunking/embedding logic ─────────────────────────────────
+    # ─── Core chunking logic ─────────────────────────────────
 
     def _run_chunking_job(self, event: dict):
-        doc_id   = event.get("document_id", "unknown")
-        text     = event.get("text", "")
-        filename = event.get("filename", "unknown")
+        doc_id   = event.get("document_id")
+        if not doc_id:
+            logger.error("No document_id provided in event")
+            return
 
-        logger.info(f"[Chunking] Starting job for document: {doc_id} ({filename})")
+        # logger.info(f"[RAG Pipeline] Starting processing for document: {doc_id}")
 
         send_log(self.logging_url, {
             "source":  "worker-service",
             "action":  "worker_status",
-            "details": {"job": "chunking_started", "document_id": doc_id, "filename": filename},
+            "details": {"job": "processing_started", "document_id": doc_id},
             "status":  "info",
         })
 
         try:
-            chunks = self._chunk_text(text)
-            embeddings = [self._fake_embedding(c) for c in chunks]
-
-            logger.info(
-                f"[Chunking] Done for {doc_id}: {len(chunks)} chunks, "
-                f"{len(embeddings)} embeddings generated"
-            )
+            # Process document (Decrypt -> Extract -> Chunk -> Save)
+            DocumentProcessor.process_document(doc_id)
+            logger.info("processing completed")
 
             send_log(self.logging_url, {
                 "source":  "worker-service",
                 "action":  "background_job_status",
                 "details": {
-                    "job":          "chunking_complete",
+                    "job":          "processing_complete",
                     "document_id":  doc_id,
-                    "chunks":       len(chunks),
-                    "embeddings":   len(embeddings),
                     "status":       "success",
                 },
                 "status": "success",
             })
 
         except Exception as exc:
-            logger.error(f"[Chunking] Failed for {doc_id}: {exc}")
+            logger.error(f"[RAG Pipeline] Failed for {doc_id}: {exc}")
             send_log(self.logging_url, {
                 "source":  "worker-service",
                 "action":  "background_job_status",
                 "details": {
-                    "job":         "chunking_failed",
+                    "job":         "processing_failed",
                     "document_id": doc_id,
                     "error":       str(exc),
                 },
                 "status": "failed",
             })
-
-    @staticmethod
-    def _chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]:
-        """Split text into overlapping chunks."""
-        if not text:
-            return []
-        words  = text.split()
-        chunks = []
-        start  = 0
-        while start < len(words):
-            end = start + chunk_size
-            chunks.append(" ".join(words[start:end]))
-            start += chunk_size - overlap
-        return chunks
-
-    @staticmethod
-    def _fake_embedding(text: str) -> str:
-        """Simulate an embedding vector (deterministic hash for demo)."""
-        return hashlib.sha256(text.encode()).hexdigest()

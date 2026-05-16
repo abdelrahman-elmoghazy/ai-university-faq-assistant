@@ -6,6 +6,7 @@ from flask import Flask
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 import os
+import logging
 
 db = SQLAlchemy()
 
@@ -22,6 +23,12 @@ def create_app():
 
     db.init_app(app)
     CORS(app)
+
+    # Sync with gunicorn logs
+    if "gunicorn" in os.environ.get("SERVER_SOFTWARE", ""):
+        gunicorn_logger = logging.getLogger("gunicorn.error")
+        app.logger.handlers = gunicorn_logger.handlers
+        app.logger.setLevel(gunicorn_logger.level)
 
     with app.app_context():
         # Ensure tables exist

@@ -272,6 +272,37 @@ INTERNAL_API_KEY=secure-key
 
 ---
 
+## 👤 Team Member 5 — Frontend, AI & File Security
+
+### Responsibilities
+* **React Frontend** — Login, Register, Dashboard, AI Chat, File Upload, Admin Panel
+* **AI Integration** — OpenRouter / Ollama / Mock fallback with RAG-ready architecture
+* **Secure File Upload** — Extension + MIME validation, blocked dangerous files
+* **File Encryption** — Fernet (AES-128-CBC) encryption at rest
+* **SHA-256 Integrity** — Pre-encryption hash stored and verified on demand
+* **Admin Dashboard** — System stats, audit logs, recent AI queries
+
+### Quick Start (Frontend)
+```bash
+cd frontend
+cp .env.example .env
+npm install
+npm run dev
+# Open http://localhost:3000
+```
+
+### File Security
+```bash
+# Generate encryption key
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Add to .env as FILE_ENCRYPTION_KEY=<generated_key>
+```
+
+### Documentation
+See [docs/team-member-5.md](docs/team-member-5.md) for full details.
+
+---
+
 ## 📌 Summary
 
 This system is designed to be a **secure, scalable, production-ready AI-powered university assistant platform** built with modern backend architecture principles, strong security layers, and modular microservices design.

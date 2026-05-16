@@ -50,13 +50,13 @@ def main():
         sys.exit(1)
 
     # Start consumers
-    auth_consumer   = AuthEventConsumer(rmq, LOGGING_SERVICE_URL)
-    doc_consumer    = DocumentConsumer(rmq, LOGGING_SERVICE_URL)
+    auth_consumer = AuthEventConsumer(rmq, LOGGING_SERVICE_URL)
+    doc_consumer = DocumentConsumer(RABBITMQ_URL, LOGGING_SERVICE_URL)
 
     auth_consumer.start()
     doc_consumer.start()
 
-    logger.info("All consumers started — waiting for messages …")
+    logger.info("Consumers started — waiting for messages …")
 
     # Keep main thread alive
     try:
@@ -71,3 +71,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -18,8 +18,17 @@ def create_app():
     with app.app_context():
         db.create_all()
         
+        # FAQ routes (Member 3/4 — preserved)
         from app.routes.faq_routes import faq_bp
         app.register_blueprint(faq_bp, url_prefix='/api/faq')
+
+        # File upload routes (Team Member 5)
+        from app.routes.file_routes import file_bp
+        app.register_blueprint(file_bp, url_prefix='/api/files')
+
+        # Admin dashboard routes (Team Member 5)
+        from app.routes.admin_routes import admin_bp
+        app.register_blueprint(admin_bp, url_prefix='/api/admin')
         
         @app.route('/health', methods=['GET'])
         def health():

@@ -20,9 +20,11 @@ logger  = logging.getLogger(__name__)
 def create_log():
     """Accept a structured log event from internal services (worker, auth)."""
     # Light internal auth — services share the same API key
-    key = request.headers.get("X-Internal-Key") or request.json.get("_internal_key", "")
+    key = request.headers.get("X-Internal-Key") or (request.get_json(silent=True) or {}).get("_internal_key", "")
     expected = current_app.config.get("INTERNAL_API_KEY", "")
+    
     if expected and key != expected:
+        current_app.logger.warning(f"Unauthorized log attempt from {request.remote_addr}")
         return jsonify({"error": "Unauthorized"}), 401
 
     data = request.get_json(force=True, silent=True) or {}

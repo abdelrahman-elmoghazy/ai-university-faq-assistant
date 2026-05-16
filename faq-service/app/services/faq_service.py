@@ -18,10 +18,14 @@ class FAQService:
             db.session.add(new_question)
             db.session.commit()
 
-            # 2. Call AI Service (mocked or external integration)
-            answer_text = FAQService._generate_ai_answer(question_text)
+            # 2. Retrieve relevant context (RAG)
+            from app.services.retrieval_service import RetrievalService
+            context_chunks = RetrievalService.get_top_chunks(user_id, question_text, limit=3)
+            
+            # 3. Call AI Service with context
+            answer_text = FAQService._generate_ai_answer(question_text, context_chunks)
 
-            # 3. Save answer
+            # 4. Save answer
             new_answer = Answer(
                 question_id=new_question.id,
                 answer_text=answer_text,
@@ -30,12 +34,17 @@ class FAQService:
             db.session.add(new_answer)
             db.session.commit()
 
-            # 4. Log audit
-            FAQService.log_audit(user_id, 'ask_question', 'success', details={'question_id': new_question.id})
+            # 5. Log audit
+            FAQService.log_audit(user_id, 'ask_question', 'success', details={
+                'question_id': new_question.id,
+                'context_used': len(context_chunks) > 0,
+                'chunks_count': len(context_chunks)
+            })
 
             return {
                 'question': new_question.to_dict(),
-                'answer': new_answer.to_dict()
+                'answer': new_answer.to_dict(),
+                'context_found': len(context_chunks) > 0
             }
         except Exception as e:
             db.session.rollback()
@@ -44,12 +53,14 @@ class FAQService:
             raise Exception("Internal server error")
 
     @staticmethod
-    def _generate_ai_answer(question_text: str) -> str:
-        # Here we integrate with the AI service safely
-        # E.g. requests.post('http://ai_service/generate', json={'prompt': question_text})
-        # If it fails, fallback safely
+    def _generate_ai_answer(question_text: str, context_chunks: list = None) -> str:
+        """
+        Generate AI answer via configured provider (OpenRouter / Ollama / mock).
+        Passes retrieved document context if available.
+        """
+        from app.services.ai_service import AIService
         try:
-            return "This is a mock AI response to: " + question_text
+            return AIService.generate_answer(question_text, context_chunks)
         except Exception as e:
             logger.error(f"AI Service failed: {str(e)}")
             return "I'm sorry, I cannot process your request right now. Please try again later."
@@ -106,5 +117,3 @@ class FAQService:
             db.session.commit()
         except Exception as e:
             logger.error(f"Error logging audit: {str(e)}")
-            # Do not rollback or raise here to prevent failing the main transaction if it was successful, 
-            # though usually it's better to log within the same transaction.
