@@ -148,13 +148,3 @@ python -m pytest tests/
 ├── docker-compose.yml      # Full stack orchestration
 └── .env.example            # Environment variable template
 ```
-
-## Team
-
-| Member | Responsibility |
-|--------|---------------|
-| Member 1 | Authentication, JWT, RBAC, OAuth |
-| Member 2 | API Gateway, Nginx, HTTPS, Docker Compose, DevOps |
-| Member 3 | FAQ Service, database schema, input validation |
-| Member 4 | RabbitMQ, Worker Service, Logging Service, Monitoring Dashboard |
-| Member 5 | Frontend, AI integration, file upload security, encryption |
