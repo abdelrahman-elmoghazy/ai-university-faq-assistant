@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react'
 import { fileApi } from '../api/fileApi'
 import ErrorMessage from '../components/ErrorMessage'
+import { useAuth } from '../hooks/useAuth'
 
 export default function Upload() {
+  const { user } = useAuth()
+  const isAdmin = user?.roles?.includes('admin')
   const [files, setFiles] = useState([])
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(true)
   const [verifyResults, setVerifyResults] = useState({})
+  const [visibility, setVisibility] = useState('private')
 
   const loadFiles = async () => {
     try {
@@ -36,6 +40,9 @@ export default function Upload() {
     setError(''); setSuccess(''); setUploading(true)
     const formData = new FormData()
     formData.append('file', file)
+    if (isAdmin) {
+      formData.append('visibility', visibility)
+    }
     try {
       const res = await fileApi.upload(formData)
       
@@ -92,6 +99,25 @@ export default function Upload() {
           <div className="card-premium space-y-8 sticky top-10">
             <h2 className="heading-lg">New Upload</h2>
             
+            {isAdmin && (
+              <div className="flex gap-4 mb-4 bg-slate-900 p-2 rounded-xl border border-white/5">
+                <button
+                  type="button"
+                  onClick={() => setVisibility('private')}
+                  className={`flex-1 py-2 text-xs font-bold uppercase tracking-widest rounded-lg transition-colors ${visibility === 'private' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:bg-white/5'}`}
+                >
+                  Private
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVisibility('public')}
+                  className={`flex-1 py-2 text-xs font-bold uppercase tracking-widest rounded-lg transition-colors ${visibility === 'public' ? 'bg-indigo-500 text-white' : 'text-slate-400 hover:bg-white/5'}`}
+                >
+                  Public
+                </button>
+              </div>
+            )}
+
             <label className={`block cursor-pointer group relative ${uploading ? 'pointer-events-none' : ''}`}>
               <div className={`border-2 border-dashed border-white/5 rounded-3xl h-[220px] flex flex-col items-center justify-center transition-all group-hover:border-indigo-500/30 group-hover:bg-white/2 ${uploading ? 'bg-white/5' : ''}`}>
                 {uploading ? (
@@ -140,8 +166,11 @@ export default function Upload() {
               {files.map((f) => (
                 <div key={f.id} className="card-premium group">
                   <div className="flex items-center gap-6 mb-6">
-                    <div className="w-12 h-12 rounded-xl bg-slate-900 flex items-center justify-center text-3xl border border-white/5">
+                    <div className="w-12 h-12 rounded-xl bg-slate-900 flex items-center justify-center text-3xl border border-white/5 relative">
                       {f.mime_type?.includes('pdf') ? '📕' : '📄'}
+                      {f.visibility === 'public' && (
+                        <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-lg">Public</div>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-lg font-bold text-white truncate">

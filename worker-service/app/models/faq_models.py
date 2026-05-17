@@ -17,6 +17,7 @@ class Document(Base):
     file_name = Column(String(255))
     file_path = Column(String(500))
     upload_status = Column(String(50))
+    visibility = Column(String(20), default='private')
     uploaded_by = Column(Integer)
     created_at = Column(DateTime, default=datetime.utcnow)
 

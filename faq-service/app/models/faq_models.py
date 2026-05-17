@@ -16,12 +16,13 @@ class Document(db.Model):
     sha256_hash = db.Column(db.String(64), nullable=True)        # SHA-256 hex digest
     encrypted_path = db.Column(db.String(500), nullable=True)    # path to encrypted file
     upload_status = db.Column(db.String(50), default='pending')  # pending, completed, failed
+    visibility = db.Column(db.String(20), default='private')     # private, public
     uploaded_by = db.Column(db.Integer, nullable=False, index=True) # user_id from auth_service
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     chunks = db.relationship('Chunk', backref='document', lazy=True, cascade='all, delete-orphan')
 
-    def __init__(self, title: str, file_name: str, file_path: str, mime_type: str, uploaded_by: int, stored_filename: str = None, size_bytes: int = None, sha256_hash: str = None, encrypted_path: str = None, upload_status: str = 'pending', **kwargs):
+    def __init__(self, title: str, file_name: str, file_path: str, mime_type: str, uploaded_by: int, stored_filename: str = None, size_bytes: int = None, sha256_hash: str = None, encrypted_path: str = None, upload_status: str = 'pending', visibility: str = 'private', **kwargs):
         super().__init__(**kwargs)
         self.title = title
         self.file_name = file_name
@@ -33,6 +34,7 @@ class Document(db.Model):
         self.sha256_hash = sha256_hash
         self.encrypted_path = encrypted_path
         self.upload_status = upload_status
+        self.visibility = visibility
 
     def to_dict(self):
         return {
@@ -44,6 +46,7 @@ class Document(db.Model):
             'sha256_hash': self.sha256_hash,
             'encrypted': bool(self.encrypted_path),
             'upload_status': self.upload_status,
+            'visibility': self.visibility,
             'uploaded_by': self.uploaded_by,
             'created_at': self.created_at.isoformat()
         }

@@ -29,8 +29,17 @@ def upload_file():
             logger.warning(f"File rejected for user {request.user_id}: {error_msg}")
             return jsonify({"error": "Validation Error", "message": error_msg}), 400
 
+        # Check visibility
+        visibility = request.form.get("visibility", "private")
+        if visibility == "public":
+            is_admin = "admin" in getattr(request, "roles", [])
+            if not is_admin:
+                return jsonify({"error": "Forbidden", "message": "Only admins can upload public documents."}), 403
+        else:
+            visibility = "private"
+
         # Upload
-        result = FileService.upload_file(file, request.user_id)
+        result = FileService.upload_file(file, request.user_id, visibility=visibility)
 
         logger.info(f"File uploaded by user {request.user_id}: {result['original_filename']}")
         return jsonify({"message": "File uploaded successfully", "file": result}), 201

@@ -256,7 +256,12 @@ export default function AdminDashboard() {
                 {files.map(f => (
                   <tr key={f.id} className="hover:bg-white/2">
                     <td className="px-6 py-4">
-                      <p className="text-sm font-bold text-white truncate max-w-[200px]" title={f.original_filename}>{f.original_filename}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold text-white truncate max-w-[200px]" title={f.original_filename}>{f.original_filename}</p>
+                        {f.visibility === 'public' && (
+                          <span className="bg-emerald-500/20 text-emerald-400 text-[8px] font-black uppercase px-1.5 py-0.5 rounded border border-emerald-500/30">Public</span>
+                        )}
+                      </div>
                       <p className="text-[10px] text-slate-500">{new Date(f.created_at).toLocaleString()}</p>
                     </td>
                     <td className="px-6 py-4 text-xs font-mono text-slate-400">Node-{f.uploaded_by}</td>

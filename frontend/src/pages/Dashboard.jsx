@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { fileApi } from '../api/fileApi'
@@ -14,39 +14,47 @@ export default function Dashboard() {
   const [questionsCount, setQuestionsCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const hasFetched = useRef(false)
 
   useEffect(() => {
-    if (hasFetched.current) return
-    hasFetched.current = true
-
     const fetchDashboardData = async () => {
       try {
         setLoading(true)
+        setError('')
         const [filesResult, faqResult] = await Promise.allSettled([
           fileApi.getMyFiles(),
           faqApi.getHistory()
         ])
         
+        let hasRequestFailed = false
+        let isRateLimited = false
+
         if (filesResult.status === 'fulfilled') {
-          setFiles(filesResult.value.data.files || [])
+          setFiles(filesResult.value?.data?.files || [])
+        } else {
+          console.warn('Failed to load files:', filesResult.reason)
+          if (filesResult.reason?.response?.status === 429) {
+            isRateLimited = true
+          } else {
+            const status = filesResult.reason?.response?.status
+            if (!status || status >= 400) {
+              hasRequestFailed = true
+            }
+          }
         }
         
         if (faqResult.status === 'fulfilled') {
-          setQuestionsCount(faqResult.value.data.history?.length || 0)
+          setQuestionsCount(faqResult.value?.data?.history?.length || 0)
+        } else {
+          console.warn('Failed to load history:', faqResult.reason)
+          setQuestionsCount(0)
+          if (faqResult.reason?.response?.status === 429) {
+            isRateLimited = true
+          }
         }
-
-        const isRateLimited = 
-          (filesResult.status === 'rejected' && filesResult.reason.response?.status === 429) ||
-          (faqResult.status === 'rejected' && faqResult.reason.response?.status === 429)
-
-        const hasOtherError = 
-          (filesResult.status === 'rejected' && filesResult.reason.response?.status !== 429) ||
-          (faqResult.status === 'rejected' && faqResult.reason.response?.status !== 429)
 
         if (isRateLimited) {
           setError('Too many requests. Please wait a moment and refresh.')
-        } else if (hasOtherError) {
+        } else if (hasRequestFailed) {
           setError('Failed to load some dashboard components. Using available data.')
         }
       } catch (err) {
@@ -68,7 +76,9 @@ export default function Dashboard() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
   }
 
-  const totalBytes = files.reduce((sum, f) => sum + (f.size_bytes || 0), 0)
+  // Filter out public documents that do not belong to the user
+  const protectedFiles = files.filter(f => f.visibility !== 'public' || f.uploaded_by === user?.id)
+  const totalBytes = protectedFiles.reduce((sum, f) => sum + (f.size_bytes || 0), 0)
 
   if (loading) return <Loading text="Syncing Security Node..." />
 
@@ -102,7 +112,7 @@ export default function Dashboard() {
         />
         <StatCard 
           label="Protected Files" 
-          value={files.length.toString()} 
+          value={protectedFiles.length.toString()} 
           icon="🛡️" 
           color="violet" 
           trend={formatSize(totalBytes)} 
@@ -158,8 +168,8 @@ export default function Dashboard() {
               </button>
             </div>
             <div className="space-y-3">
-              {files.length > 0 ? (
-                files.slice(0, 5).map(file => (
+              {protectedFiles.length > 0 ? (
+                protectedFiles.slice(0, 5).map(file => (
                   <div key={file.id} className="flex items-center gap-5 p-4 rounded-xl bg-white/2 border border-white/5 hover:border-white/10 transition-all">
                     <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-xl">
                       {file.file_type?.includes('pdf') ? '📕' : file.file_type?.includes('doc') ? '📘' : '📄'}

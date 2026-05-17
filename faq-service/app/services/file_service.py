@@ -73,7 +73,7 @@ class FileService:
         return True, None
 
     @staticmethod
-    def upload_file(file, user_id: int) -> dict:
+    def upload_file(file, user_id: int, visibility: str = 'private') -> dict:
         """
         Process and store an uploaded file securely.
         Flow: validate → read → SHA-256 → encrypt → store → save metadata.
@@ -119,7 +119,8 @@ class FileService:
             sha256_hash=sha256_hash,
             encrypted_path=encrypted_path,
             upload_status="completed",
-            uploaded_by=user_id
+            uploaded_by=user_id,
+            visibility=visibility
         )
         db.session.add(doc)
         db.session.commit()
@@ -132,7 +133,7 @@ class FileService:
             "filename": original_filename
         })
 
-        logger.info(f"File uploaded: {original_filename} by user {user_id} → {stored_filename}")
+        logger.info(f"File uploaded: {original_filename} by user {user_id} → {stored_filename} [visibility: {visibility}]")
 
         return {
             "id": doc.id,
@@ -143,6 +144,7 @@ class FileService:
             "sha256_hash": sha256_hash,
             "encrypted": True,
             "upload_status": "completed",
+            "visibility": visibility,
             "created_at": doc.created_at.isoformat()
         }
 
