@@ -1,8 +1,76 @@
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { fileApi } from '../api/fileApi'
+import { faqApi } from '../api/faqApi'
 import StatCard from '../components/StatCard'
+import Loading from '../components/Loading'
+import ErrorMessage from '../components/ErrorMessage'
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const navigate = useNavigate()
+  const [files, setFiles] = useState([])
+  const [questionsCount, setQuestionsCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const hasFetched = useRef(false)
+
+  useEffect(() => {
+    if (hasFetched.current) return
+    hasFetched.current = true
+
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true)
+        const [filesResult, faqResult] = await Promise.allSettled([
+          fileApi.getMyFiles(),
+          faqApi.getHistory()
+        ])
+        
+        if (filesResult.status === 'fulfilled') {
+          setFiles(filesResult.value.data.files || [])
+        }
+        
+        if (faqResult.status === 'fulfilled') {
+          setQuestionsCount(faqResult.value.data.history?.length || 0)
+        }
+
+        const isRateLimited = 
+          (filesResult.status === 'rejected' && filesResult.reason.response?.status === 429) ||
+          (faqResult.status === 'rejected' && faqResult.reason.response?.status === 429)
+
+        const hasOtherError = 
+          (filesResult.status === 'rejected' && filesResult.reason.response?.status !== 429) ||
+          (faqResult.status === 'rejected' && faqResult.reason.response?.status !== 429)
+
+        if (isRateLimited) {
+          setError('Too many requests. Please wait a moment and refresh.')
+        } else if (hasOtherError) {
+          setError('Failed to load some dashboard components. Using available data.')
+        }
+      } catch (err) {
+        console.error('Unexpected error in dashboard data fetch:', err)
+        setError('An unexpected error occurred.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDashboardData()
+  }, [])
+
+  const formatSize = (bytes) => {
+    if (!bytes) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+  }
+
+  const totalBytes = files.reduce((sum, f) => sum + (f.size_bytes || 0), 0)
+
+  if (loading) return <Loading text="Syncing Security Node..." />
 
   return (
     <div className="animate-slide-up space-y-10">
@@ -21,11 +89,31 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {error && <ErrorMessage message={error} onClose={() => setError('')} />}
+
       {/* Hero Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <StatCard label="AI Questions" value="12" icon="💬" color="indigo" trend="+2 New" />
-        <StatCard label="Protected Files" value="5" icon="🛡️" color="violet" trend="8.2 MB" />
-        <StatCard label="System Security" value="100%" icon="✅" color="emerald" trend="Optimal" />
+        <StatCard 
+          label="AI Questions" 
+          value={questionsCount.toString()} 
+          icon="💬" 
+          color="indigo" 
+          trend="Total Interactions" 
+        />
+        <StatCard 
+          label="Protected Files" 
+          value={files.length.toString()} 
+          icon="🛡️" 
+          color="violet" 
+          trend={formatSize(totalBytes)} 
+        />
+        <StatCard 
+          label="System Status" 
+          value="Active" 
+          icon="✅" 
+          color="emerald" 
+          trend="Encryption Verified" 
+        />
       </div>
 
       {/* Main Grid */}
@@ -35,7 +123,10 @@ export default function Dashboard() {
           <section className="card-premium">
             <h2 className="heading-lg mb-8">Core Functions</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <button className="flex items-center gap-5 p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 hover:bg-indigo-500/10 hover:border-indigo-500/20 transition-all text-left group">
+              <button 
+                onClick={() => navigate('/chat')}
+                className="flex items-center gap-5 p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 hover:bg-indigo-500/10 hover:border-indigo-500/20 transition-all text-left group"
+              >
                 <div className="w-12 h-12 rounded-xl bg-indigo-500 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">🤖</div>
                 <div>
                   <p className="text-lg font-bold text-white">AI Assistant</p>
@@ -43,7 +134,10 @@ export default function Dashboard() {
                 </div>
               </button>
               
-              <button className="flex items-center gap-5 p-6 rounded-2xl bg-violet-500/5 border border-violet-500/10 hover:bg-violet-500/10 hover:border-violet-500/20 transition-all text-left group">
+              <button 
+                onClick={() => navigate('/upload')}
+                className="flex items-center gap-5 p-6 rounded-2xl bg-violet-500/5 border border-violet-500/10 hover:bg-violet-500/10 hover:border-violet-500/20 transition-all text-left group"
+              >
                 <div className="w-12 h-12 rounded-xl bg-violet-500 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">📤</div>
                 <div>
                   <p className="text-lg font-bold text-white">Secure Vault</p>
@@ -56,19 +150,38 @@ export default function Dashboard() {
           <section className="card-premium">
             <div className="flex items-center justify-between mb-8">
               <h2 className="heading-lg">Protected Assets</h2>
-              <button className="text-xs font-bold text-indigo-400 hover:underline">View All</button>
+              <button 
+                onClick={() => navigate('/upload')}
+                className="text-xs font-bold text-indigo-400 hover:underline"
+              >
+                Manage Files
+              </button>
             </div>
             <div className="space-y-3">
-              {[1, 2].map(i => (
-                <div key={i} className="flex items-center gap-5 p-4 rounded-xl bg-white/2 border border-white/5 hover:border-white/10 transition-all">
-                  <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-xl">📕</div>
-                  <div className="flex-1">
-                    <p className="text-sm font-bold text-white">Enrollment_Guidelines_2026.pdf</p>
-                    <p className="text-[10px] text-slate-500">Stored May 1{i}, 2026 • 2.4 MB</p>
+              {files.length > 0 ? (
+                files.slice(0, 5).map(file => (
+                  <div key={file.id} className="flex items-center gap-5 p-4 rounded-xl bg-white/2 border border-white/5 hover:border-white/10 transition-all">
+                    <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-xl">
+                      {file.file_type?.includes('pdf') ? '📕' : file.file_type?.includes('doc') ? '📘' : '📄'}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-white truncate max-w-[200px] md:max-w-xs" title={file.original_filename || file.file_name}>
+                        {file.original_filename || file.file_name}
+                      </p>
+                      <p className="text-[10px] text-slate-500">
+                        Stored {new Date(file.created_at).toLocaleDateString()} • {formatSize(file.size_bytes)}
+                      </p>
+                    </div>
+                    <div className="px-3 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase tracking-widest">
+                      {file.status === 'processed' ? 'Encrypted' : file.status}
+                    </div>
                   </div>
-                  <div className="px-3 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase tracking-widest">Encrypted</div>
+                ))
+              ) : (
+                <div className="text-center py-10 text-slate-500 border border-dashed border-white/5 rounded-2xl">
+                  <p className="text-sm">No protected files uploaded yet.</p>
                 </div>
-              ))}
+              )}
             </div>
           </section>
         </div>
@@ -80,19 +193,24 @@ export default function Dashboard() {
             <div className="space-y-4">
               <div className="flex gap-3">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0"></div>
-                <p className="text-sm text-slate-300">Fernet encryption active on all disk commits.</p>
+                <p className="text-sm text-slate-300">Fernet AES-256 encryption active.</p>
               </div>
               <div className="flex gap-3">
                 <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0"></div>
-                <p className="text-sm text-slate-300">Node synchronization successful.</p>
+                <p className="text-sm text-slate-300">Distributed RAG nodes synchronized.</p>
               </div>
             </div>
           </section>
           
           <div className="card-premium bg-gradient-to-br from-indigo-500/10 to-violet-500/10 border-indigo-500/20">
             <h3 className="text-lg font-bold text-white mb-2">Need Help?</h3>
-            <p className="text-sm text-slate-400 mb-6">System documentation is available for all authorized users.</p>
-            <button className="w-full btn-premium bg-white text-indigo-950 font-bold !h-10 text-xs uppercase tracking-widest">Open Docs</button>
+            <p className="text-sm text-slate-400 mb-6">Access the secure vault to manage your protected knowledge assets.</p>
+            <button 
+              onClick={() => navigate('/upload')}
+              className="w-full btn-premium bg-white text-indigo-950 font-bold !h-10 text-xs uppercase tracking-widest"
+            >
+              Go to Vault
+            </button>
           </div>
         </div>
       </div>

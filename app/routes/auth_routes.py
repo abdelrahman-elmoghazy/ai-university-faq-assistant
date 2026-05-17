@@ -401,8 +401,17 @@ def github_oauth_callback():
                 'message': str(e)
             }), 422
 
-        # Get user info from GitHub
-        user_info, error = GitHubOAuthService.get_user_info(req.access_token)
+        # 1. Exchange code for access token
+        access_token, error = GitHubOAuthService.exchange_code_for_token(req.code)
+        
+        if error:
+            return jsonify({
+                'error': 'OAuth Error',
+                'message': error
+            }), 400
+
+        # 2. Get user info from GitHub using the token
+        user_info, error = GitHubOAuthService.get_user_info(access_token)
 
         if error:
             return jsonify({

@@ -172,6 +172,28 @@ class FileService:
         return FileService._doc_to_dict(doc)
 
     @staticmethod
+    def delete_file(file_id: int, user_id: int, is_admin: bool = False) -> bool:
+        """Safely delete a file metadata and the encrypted file on disk."""
+        doc = Document.query.get(file_id)
+        if not doc:
+            return False
+
+        if not is_admin and doc.uploaded_by != user_id:
+            raise PermissionError("You do not have access to delete this file.")
+
+        # Remove from disk
+        if doc.encrypted_path and os.path.exists(doc.encrypted_path):
+            try:
+                os.remove(doc.encrypted_path)
+            except Exception as e:
+                logger.error(f"Failed to delete file on disk {doc.encrypted_path}: {e}")
+
+        # Delete from DB
+        db.session.delete(doc)
+        db.session.commit()
+        return True
+
+    @staticmethod
     def verify_file_integrity(file_id: int, user_id: int, is_admin: bool = False) -> dict:
         """
         Verify SHA-256 integrity of a stored file.

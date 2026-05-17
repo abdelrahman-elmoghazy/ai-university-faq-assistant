@@ -104,7 +104,7 @@ class GoogleTokenRequest(BaseModel):
 
 class GitHubTokenRequest(BaseModel):
     """GitHub OAuth token request"""
-    access_token: str
+    code: str
 
 
 class ErrorResponse(BaseModel):

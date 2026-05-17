@@ -1,12 +1,40 @@
 import requests
 import logging
 import secrets
+import re
 from typing import Optional, Dict, Any, Tuple
 from app.models import User, Role, UserRole, db
 from app.services.auth import AuthService
 from flask import current_app
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_username(username: str) -> str:
+    """
+    Sanitize username for database constraints.
+    - Convert to lowercase
+    - Replace non-alphanumeric (except underscores) with underscores
+    - Strip leading/trailing underscores
+    - Collapse multiple underscores
+    """
+    # Convert to lowercase
+    username = username.lower()
+    
+    # Replace non-alphanumeric with underscores
+    username = re.sub(r'[^a-z0-9_]', '_', username)
+    
+    # Collapse multiple underscores
+    username = re.sub(r'_+', '_', username)
+    
+    # Strip leading/trailing underscores
+    username = username.strip('_')
+    
+    # Fallback if empty after stripping
+    if not username:
+        username = f"user_{secrets.token_hex(4)}"
+        
+    return username
 
 
 class GoogleOAuthService:
@@ -67,7 +95,7 @@ class GoogleOAuthService:
                 return user, None
 
             # Create new user
-            username = email.split('@')[0]
+            username = _sanitize_username(email.split('@')[0])
             
             # Ensure unique username
             counter = 1
@@ -75,6 +103,8 @@ class GoogleOAuthService:
             while User.query.filter_by(username=username).first():
                 username = f"{original_username}{counter}"
                 counter += 1
+
+            logger.info(f"Creating new Google OAuth user: provider=google, email={email}, username={username}")
 
             user = User(
                 username=username,
@@ -94,22 +124,62 @@ class GoogleOAuthService:
             db.session.add(user_role)
             db.session.commit()
 
-            logger.info(f"New Google OAuth user created: {email}")
+            logger.info(f"New Google OAuth user created successfully: {email}")
             return user, None
 
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Google OAuth authentication error: {str(e)}")
+            logger.error(f"Google OAuth authentication error for {user_info.get('email')}: {str(e)}")
             return None, str(e)
 
 
 class GitHubOAuthService:
-    """GitHub OAuth2 service"""
+    """GitHub OAuth2 service (Authorization Code Flow)"""
+
+    @staticmethod
+    def exchange_code_for_token(code: str) -> Tuple[Optional[str], Optional[str]]:
+        """Exchange authorization code for access token"""
+        try:
+            client_id = current_app.config.get('GITHUB_CLIENT_ID')
+            client_secret = current_app.config.get('GITHUB_CLIENT_SECRET')
+
+            if not client_id or not client_secret:
+                return None, "GitHub OAuth configuration is missing"
+
+            response = requests.post(
+                'https://github.com/login/oauth/access_token',
+                headers={'Accept': 'application/json'},
+                data={
+                    'client_id': client_id,
+                    'client_secret': client_secret,
+                    'code': code
+                },
+                timeout=10
+            )
+
+            if response.status_code != 200:
+                return None, f"GitHub token exchange failed: {response.text}"
+
+            data = response.json()
+            access_token = data.get('access_token')
+
+            if not access_token:
+                return None, f"GitHub returned no access token: {data.get('error_description', 'Unknown error')}"
+
+            return access_token, None
+
+        except requests.RequestException as e:
+            logger.error(f"GitHub token exchange request error: {str(e)}")
+            return None, "Failed to connect to GitHub for token exchange"
+        except Exception as e:
+            logger.error(f"GitHub token exchange error: {str(e)}")
+            return None, str(e)
 
     @staticmethod
     def get_user_info(access_token: str) -> Tuple[Optional[Dict], Optional[str]]:
-        """Get user info from GitHub using access token"""
+        """Get user info and email from GitHub using access token"""
         try:
+            # 1. Get base profile
             response = requests.get(
                 'https://api.github.com/user',
                 headers={
@@ -122,7 +192,27 @@ class GitHubOAuthService:
             if response.status_code != 200:
                 return None, "Failed to get user info from GitHub"
 
-            return response.json(), None
+            user_info = response.json()
+
+            # 2. Get email if not public in profile
+            if not user_info.get('email'):
+                email_res = requests.get(
+                    'https://api.github.com/user/emails',
+                    headers={
+                        'Authorization': f'Bearer {access_token}',
+                        'Accept': 'application/vnd.github.v3+json'
+                    },
+                    timeout=5
+                )
+                if email_res.status_code == 200:
+                    emails = email_res.json()
+                    # Find primary, verified email
+                    primary_email = next((e['email'] for e in emails if e['primary'] and e['verified']), None)
+                    if not primary_email and emails:
+                        primary_email = emails[0]['email']
+                    user_info['email'] = primary_email
+
+            return user_info, None
 
         except requests.RequestException as e:
             logger.error(f"GitHub API request error: {str(e)}")
@@ -164,7 +254,7 @@ class GitHubOAuthService:
                     return user, None
 
             # Create new user
-            username = login
+            username = _sanitize_username(login)
             
             # Ensure unique username
             counter = 1
@@ -176,6 +266,8 @@ class GitHubOAuthService:
             # Use login@ as email if not provided
             if not email:
                 email = f"{login}@github.local"
+
+            logger.info(f"Creating new GitHub OAuth user: provider=github, email={email}, username={username}")
 
             user = User(
                 username=username,
@@ -195,10 +287,10 @@ class GitHubOAuthService:
             db.session.add(user_role)
             db.session.commit()
 
-            logger.info(f"New GitHub OAuth user created: {login}")
+            logger.info(f"New GitHub OAuth user created successfully: {login}")
             return user, None
 
         except Exception as e:
             db.session.rollback()
-            logger.error(f"GitHub OAuth authentication error: {str(e)}")
+            logger.error(f"GitHub OAuth authentication error for {user_info.get('email', login)}: {str(e)}")
             return None, str(e)

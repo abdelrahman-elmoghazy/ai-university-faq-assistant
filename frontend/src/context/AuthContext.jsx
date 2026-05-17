@@ -28,9 +28,52 @@ export function AuthProvider({ children }) {
       localStorage.setItem('access_token', access_token)
       localStorage.setItem('refresh_token', refresh_token)
       setUser(userData)
-      return { success: true }
+      return { 
+        success: true, 
+        isAdmin: userData.roles?.includes('admin')
+      }
     } catch (err) {
       const msg = err.response?.data?.message || 'Login failed'
+      return { success: false, error: msg }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loginWithGoogle = async (accessToken) => {
+    setLoading(true)
+    try {
+      const res = await authApi.loginWithGoogle(accessToken)
+      const { access_token, refresh_token, user: userData } = res.data
+      localStorage.setItem('access_token', access_token)
+      localStorage.setItem('refresh_token', refresh_token)
+      setUser(userData)
+      return { 
+        success: true, 
+        isAdmin: userData.roles?.includes('admin') 
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Google login failed'
+      return { success: false, error: msg }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loginWithGithub = async (code) => {
+    setLoading(true)
+    try {
+      const res = await authApi.loginWithGithub(code)
+      const { access_token, refresh_token, user: userData } = res.data
+      localStorage.setItem('access_token', access_token)
+      localStorage.setItem('refresh_token', refresh_token)
+      setUser(userData)
+      return { 
+        success: true, 
+        isAdmin: userData.roles?.includes('admin') 
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || 'GitHub login failed'
       return { success: false, error: msg }
     } finally {
       setLoading(false)
@@ -65,7 +108,7 @@ export function AuthProvider({ children }) {
   const isAdmin = user?.roles?.includes('admin')
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, isAdmin }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithGoogle, loginWithGithub, register, logout, isAdmin }}>
       {children}
     </AuthContext.Provider>
   )
